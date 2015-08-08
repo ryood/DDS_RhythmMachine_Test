@@ -31,7 +31,7 @@ decayAmount       : 8bit
 bpmAmount         : 8bit
 **********************************************************/
 #define SAMPLE_CLOCK		(48000u)	// 48kHz
-#define MAX_DECAY_LEN		(48000u)	// 1秒 : 60BPM
+#define MAX_DECAY_LEN		(48000u)	// 1秒
 
 #define TRACK_N				(3u)		// トラックの個数
 #define LOOKUP_TABLE_SIZE	(1024u)		// Lookup Table の要素数
@@ -41,9 +41,7 @@ bpmAmount         : 8bit
 // BPM
 uint8_t bpm = 120;
 // 再生時間
-int period = SAMPLE_CLOCK;
-
-int tick = 0;
+int period = SAMPLE_CLOCK * 2;
 
 struct track {
 	int16_t *lookupTable;
@@ -79,7 +77,7 @@ void initTracks()
 	tracks[kick].lookupTable = waveTableSine;
 	tracks[kick].waveFrequency = 60.0f;
 	tracks[kick].decayAmount = 127;
-	tracks[kick].ampAmount = 127;
+	tracks[kick].ampAmount = 200;
 	tracks[kick].toneAmount = 127;
 	tracks[kick].decayCount = 0;
 	tracks[kick].decayStop = 0;
@@ -87,8 +85,8 @@ void initTracks()
 
 	// Snare
 	tracks[snare].lookupTable = waveTableSnare;
-	tracks[snare].waveFrequency = 200.0f;
-	tracks[snare].decayAmount = 127;
+	tracks[snare].waveFrequency = 10.0f;
+	tracks[snare].decayAmount = 32;
 	tracks[snare].ampAmount = 127;
 	tracks[snare].toneAmount = 127;
 	tracks[snare].decayCount = 0;
@@ -97,9 +95,9 @@ void initTracks()
 
 	// HiHat
 	tracks[hihat].lookupTable = waveTableWhiteNoise;
-	tracks[hihat].waveFrequency = 1000.0f;
-	tracks[hihat].decayAmount = 127;
-	tracks[hihat].ampAmount = 127;
+	tracks[hihat].waveFrequency = 10.0f;
+	tracks[hihat].decayAmount = 8;
+	tracks[hihat].ampAmount = 64;
 	tracks[hihat].toneAmount = 127;
 	tracks[hihat].decayCount = 0;
 	tracks[hihat].decayStop = 0;
@@ -108,8 +106,9 @@ void initTracks()
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	double bps = (double)bpm / 60;
-	int beatCount = 0;
+	double notePerSecond = (double)bpm * 4 / 60;
+	int tick = -1;		// 初回に0にインクリメント
+	int noteCount = 0;
 
 	_setmode(_fileno(stdout), _O_BINARY);
 	
@@ -127,11 +126,16 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	for (int i = 0; i < period; i++)
 	{
-		if (tick % (int)(SAMPLE_CLOCK /  bps) == 0) {
+		tick++;
+		
+		if (tick >= (int)(SAMPLE_CLOCK / notePerSecond)) {
 			// ↑整数演算のために丸めているので注意
+			
+			noteCount++;
+			//printf("%d\t%d\n", tick, noteCount);
 
-			beatCount++;
-			//printf("%d\t%d\n", tick, beatCount);
+			// beatの先頭でtickをリセット
+			tick = 0;
 
 			// Beatの先頭でdecayCountをリセット
 			for (int i = kick; i <= hihat; i++) {
@@ -140,13 +144,12 @@ int _tmain(int argc, _TCHAR* argv[])
 				tracks[i].decayStop = 0;
 			}
 		}
-		tick++;
-		//printf("%d\n", tick);
-		
+		//printf("%d\t%d", noteCount, tick);
+				
 		// トラックの処理
 		//
 		for (int i = kick; i <= hihat; i++) { 
-			//printf("%d\t%d\n", beatCount, tracks[i].decayCount);
+			//printf("%d\t%d\n", noteCount, tracks[i].decayCount);
 			
 			// Decayの処理 ***********************************************************
 			//
@@ -177,27 +180,31 @@ int _tmain(int argc, _TCHAR* argv[])
 			//printf("waveValue:\t%f\n", tracks[i].waveValue);
 
 			// 浮動小数点に変換  (-1.0 .. 1.0)
-			tracks[i].waveValue = 2.0f * tracks[i].waveValue / INT16_MAX;
+			tracks[i].waveValue = (double)tracks[i].waveValue / (INT16_MAX+1);
 			//printf("waveValue:\t%f\n", tracks[i].waveValue);
 			//printf("%f\t", tracks[i].waveValue);
 			
 			// 振幅変調 --------------------------------------------------------------
 			//
 			tracks[i].waveValue *= amValue;
-			//printf("%f\n", tracks[i].waveValue);
+			//printf("%f\t", tracks[i].waveValue);
 		}
 		
 		// トラックの合成
 		//
+		//printf("%d", noteCount % SEQUENCE_LEN);
 		double waveValue = 0.0f;
 		for (int i = kick; i <= hihat; i++) {
 			double v = tracks[i].waveValue
-					* tracks[i].sequence[beatCount % SEQUENCE_LEN]
-					* tracks[i].ampAmount / UINT8_MAX;
-					
-			printf("%f\t", v);
+				* ((double)tracks[i].sequence[noteCount % SEQUENCE_LEN])
+				* ((double)tracks[i].ampAmount / UINT8_MAX)
+				;
+			//printf("%f\t", v);
 			waveValue += v; 
 		}
+
+		//　for precise float output 
+		printf("%f", waveValue);
 		printf("\n");
 		
 		// 出力値の補正 ***********************************************************
