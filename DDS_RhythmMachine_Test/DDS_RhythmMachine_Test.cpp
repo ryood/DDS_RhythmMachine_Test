@@ -20,7 +20,7 @@
 #include "WaveTable16bit.h"
 
 /*********************************************************
-lookupTable       : 16bit : 0..65535
+lookupTable       : 16bit : -32768..32767
 
 wavePhaseRegister : 32bit
 waveTunigWord     : 32bit
