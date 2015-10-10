@@ -5,6 +5,7 @@
 // Wave:  DDSで生成
 // Decay: 線形補間で生成
 //
+// 2015.10.11 Q16に変更 （途中）
 // 2015.10.08 固定小数点演算 （途中）
 //
 
@@ -18,15 +19,16 @@
 #include <io.h>
 #include <fcntl.h>
 
-#include "WaveTable16bit.h"
+#include "WaveTableFp32.h"
 #include "fixedpoint.h"
 
 /*********************************************************
-lookupTable       : 16bit : -32768..32767
+lookupTable       : fp32 Q16 : -1.0 .. +1.0
 
 wavePhaseRegister : 32bit
 waveTunigWord     : 32bit
 
+waveFrequency     : double
 ampAmount         : 8bit
 toneAmount        : 8bit
 decayAmount       : 8bit
@@ -46,6 +48,10 @@ bpmAmount         : 8bit
 // 変数の初期値
 #define INITIAL_BPM			(120u)
 
+// カウンター
+int tick = -1;				// 初回に0にインクリメント
+int noteCount = 0;
+
 // BPM
 uint8_t bpm;				// 1分あたりのbeat数 (beat=note*4)
 uint32_t noteTicks;			// noteあたりのサンプリング数
@@ -54,8 +60,8 @@ uint32_t noteTicks;			// noteあたりのサンプリング数
 int period = SAMPLE_CLOCK * 2;
 
 struct track {
-	int16_t *lookupTable;
-	fp32 waveFrequency;
+	const fp32 *lookupTable;
+	double waveFrequency;
 	uint8_t decayAmount;
 	uint8_t ampAmount;
 	uint8_t toneAmount;
@@ -85,7 +91,7 @@ void initTracks()
 #endif
 	// Kick
 	tracks[0].lookupTable = waveTableSine;
-	tracks[0].waveFrequency = int_to_fp32(60);
+	tracks[0].waveFrequency = 60.0f;
 	tracks[0].decayAmount = 127;
 	tracks[0].ampAmount = 200;
 	tracks[0].toneAmount = 127;
@@ -118,32 +124,29 @@ void initTracks()
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	int tick = -1;		// 初回に0にインクリメント
-	int noteCount = 0;
-
 	_setmode(_fileno(stdout), _O_BINARY);
 	
 	initTracks();
 
 	// DDS用の変数の初期化
-	for (int i = 0; i < TRACK_N; i++) {
-		double dblTuningWord = fp32_to_double(tracks[i].waveFrequency) * POW_2_32 / SAMPLE_CLOCK;
-		tracks[i].tuningWord = dblTuningWord;
+	for (int i = 0; i < TRACK_N; i++) {		
+		tracks[i].tuningWord = tracks[i].waveFrequency * POW_2_32 / SAMPLE_CLOCK;
 		tracks[i].phaseRegister = 0;
-		//printf("track:%d\ttunigWord:%u\tphaseRegister:%u\n", i, tracks[i].tuningWord, tracks[i].phaseRegister);
+		printf("track:%d\ttunigWord:%u\tphaseRegister:%u\n", i, tracks[i].tuningWord, tracks[i].phaseRegister);
 
 		// Decayの最大値を設定
 		tracks[i].decayPeriod = tracks[i].decayAmount * MAX_DECAY_LEN / 256;
-		//printf("decayPeriod:\t%d\t%d\n", i, tracks[i].decayPeriod);
+		printf("decayPeriod:\t%d\t%d\n", i, tracks[i].decayPeriod);
 	}
 
 	// BPMの計算
 	//
 	bpm = INITIAL_BPM;
-	//printf("bpm:\t%d\n", bpm);
+	printf("bpm:\t%d\n", bpm);
 
-	noteTicks = SAMPLE_CLOCK / (bpm * 4 / 60);
-	//printf("noteTicks:\t%d\n", noteTicks);
+	noteTicks = SAMPLE_CLOCK * 60 / (bpm * 4);
+	// ↑整数演算のため丸めているので注意
+	printf("noteTicks:\t%d\n", noteTicks);
 
 	for (int i = 0; i < period; i++)
 	{
@@ -168,7 +171,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		// トラックの処理
 		//
 		for (int j = 0; j < TRACK_N; j++) { 
-			printf("tick:%d\t noteCount:%d\t track:%d\t decayCount:%d\n", tick, noteCount, j, tracks[j].decayCount);
+			//printf("tick:%d\t noteCount:%d\t track:%d\t decayCount:%d\n", tick, noteCount, j, tracks[j].decayCount);
 			
 			// Decayの処理 ***********************************************************
 			//
@@ -181,6 +184,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 			// decayValue = 1.0f - decayCount / decayPeriod
 			fp32 decayRev = fp32_div(int_to_fp32(tracks[j].decayCount), int_to_fp32(tracks[j].decayPeriod));
+			printf("%f\n", fp32_to_double(decayRev));
 			tracks[j].decayValue = fp32_sub(int_to_fp32(1), decayRev);
 			//printf("decayValue\ttrack:%d\t%f\n", j, fp32_to_double(tracks[j].decayValue));
 			//printf("%d\t%f\n", tick, fp32_to_double(tracks[j].decayValue));
