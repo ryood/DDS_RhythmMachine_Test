@@ -6,7 +6,7 @@
 typedef int32_t fp32;
 typedef int64_t fp64;
 
-#define FIXQ				(24u)
+#define FIXQ				(16u)
 #define double_to_fp32(x)	((fp32)((1u<<FIXQ)*((double)x)))
 #define fp32_to_double(x)	(((double)(x))/(1u<<FIXQ))
 #define int_to_fp32(x)		((fp32)(((int32_t)(x))<<FIXQ))

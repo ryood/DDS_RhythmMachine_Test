@@ -2,6 +2,7 @@
 //
 // Decay波形生成テスト
 //
+// 2015.10.11 Decayの長さに合わせてDecayの再生周波数に重み付け
 // 2015.10.11 Created decayのindexの増加はperiodの終了で中断する
 //
 
@@ -15,24 +16,24 @@
 #include "ModTableFp32.h"
 
 #define SAMPLE_CLOCK          (48000u)
-#define MOD_LOOKUP_TABLE_SIZE (128u)
+//#define MOD_LOOKUP_TABLE_SIZE (128u)
 
-#define POW_2_32			  (4294967296ul) // 2の32乗
+#define POW_2_32			  (4294967296ull) // 2の32乗 (64bit整数)
 
 // カウンター
 int tick = -1;				// 初回に0にインクリメント
 int noteCount = 0;
 
 // BPM
-uint8_t bpm = 240;			// 1分あたりのbeat数 (beat=note*4)
+uint8_t bpm = 120;			// 1分あたりのbeat数 (beat=note*4)
 
 int32_t ticksPerNote;		// noteあたりのサンプリング数
 
-int period = 12000;
+int period = 24000;
 
 // Parameter
 const fp32 *decayLookupTable;
-uint8_t decayAmount = 255;
+uint8_t decayAmount = 127;
 
 uint32_t decayPhaseRegister;
 uint32_t decayTuningWord;
@@ -55,27 +56,29 @@ int _tmain(int argc, _TCHAR* argv[])
 	printf("ticksPerNote:\t%d\n", ticksPerNote);
 
 	// DDS変数の初期化------------------------------------------------------------------------
+	//
 	// 浮動小数点演算
-	//decayPeriod = (SAMPLE_CLOCK / (((double)bpm / 60) * 4))  * ((double)decayAmount / 256);
-	// 整数演算
-	decayPeriod = ((uint32_t)SAMPLE_CLOCK * 60 * decayAmount) / ((uint32_t)bpm * 4 * 256);
+	//decayPeriod = (SAMPLE_CLOCK / (((double)bpm / 60) * 4)) * ((double)decayAmount / 256);
+	// 整数演算(64bit)
+	decayPeriod = ((uint64_t)SAMPLE_CLOCK * 60 * decayAmount) / ((uint64_t)bpm * 4 * 256);
 	
-	// decayの周波数は1note分
+	// decay波形の周期は1note分
 	// 浮動小数点演算
 	//decayTuningWord = (((double)bpm / 60) * 4) * (uint64_t)POW_2_32 / SAMPLE_CLOCK;
 	// 整数演算(64bit)
 	//decayTuningWord = bpm * ((uint64_t)POW_2_32 / 60) * 4 / SAMPLE_CLOCK;
 
-	// decayの周波数にdecayAmountで重み付け
+	// decay波形の周期にdecayAmountで重み付け
 	// 浮動小数点演算
 	//decayTuningWord = ((((double)bpm / 60) * 4) / ((double)decayAmount / 256)) * (double)POW_2_32 / SAMPLE_CLOCK;
 	// 整数演算(64bit)
 	decayTuningWord = (bpm * ((uint64_t)POW_2_32 / 60) * 4 * 256 / decayAmount) / SAMPLE_CLOCK;
-  	
-	decayPhaseRegister = 0;
-
-	printf("tunigWord:%u\tphaseRegister:%u\tperiod:%u\n", decayTuningWord, decayPhaseRegister, decayPeriod);
+ 
+	printf("decayAmount:\t%u\n", decayAmount);
+	printf("decayPeriod:\t%u\n", decayPeriod);
+	printf("decayTunigWord:\t%u\n", decayTuningWord);
 	
+	decayPhaseRegister = 0;
 	decayStop = 0;
 
 	for (int i = 0; i < period; i++) {
@@ -90,7 +93,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			tick = 0;
 
 			// noteの先頭でdecay波形生成の再開
-			//decayPhaseRegister = 0;
+			decayPhaseRegister = 0;
 			decayStop = 0;
 		}
 		printf("%d\t%d\t", noteCount, tick);
@@ -100,14 +103,16 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (!decayStop) {
 			decayPhaseRegister += decayTuningWord;
 		}
-		if (tick == decayPeriod) {
+		if (tick == decayPeriod - 1) {
 			decayStop = 1;
-			decayPhaseRegister = 0;
 		}
 
 		// 32bitのphaseRegisterをテーブルの7bit(128個)に丸める
 		int decayIndex = decayPhaseRegister >> 25;
-		printf("decayPhaseregister:\t%d\tdecayIndex:\t%d\n", decayPhaseRegister, decayIndex);
+		printf("%d\t%d\t", decayPhaseRegister, decayIndex);
+
+		decayValue = *(decayLookupTable + decayIndex);
+		printf("%f\n", fp32_to_double(decayValue));
 	}
 
 	return 0;
