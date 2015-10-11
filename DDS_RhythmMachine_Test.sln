@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DDS_RhythmMachine_Test", "DDS_RhythmMachine_Test\DDS_RhythmMachine_Test.vcxproj", "{DFFFB4AD-C39D-42A9-9B3B-D2158BD84180}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DDS_Decay_Test", "DDS_Decay_Test\DDS_Decay_Test.vcxproj", "{5368AFE6-8167-489B-A47B-0494049BDDFA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -15,6 +17,10 @@ Global
 		{DFFFB4AD-C39D-42A9-9B3B-D2158BD84180}.Debug|Win32.Build.0 = Debug|Win32
 		{DFFFB4AD-C39D-42A9-9B3B-D2158BD84180}.Release|Win32.ActiveCfg = Release|Win32
 		{DFFFB4AD-C39D-42A9-9B3B-D2158BD84180}.Release|Win32.Build.0 = Release|Win32
+		{5368AFE6-8167-489B-A47B-0494049BDDFA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5368AFE6-8167-489B-A47B-0494049BDDFA}.Debug|Win32.Build.0 = Debug|Win32
+		{5368AFE6-8167-489B-A47B-0494049BDDFA}.Release|Win32.ActiveCfg = Release|Win32
+		{5368AFE6-8167-489B-A47B-0494049BDDFA}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
