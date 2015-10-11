@@ -30,6 +30,9 @@
     <ClInclude Include="WaveTableFp32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ModTableFp32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
