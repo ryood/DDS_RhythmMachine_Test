@@ -45,7 +45,7 @@ bpmAmount         : 8bit
 //#define TRACK_N				(3u)		// トラックの個数
 #define TRACK_N				  (1u)		// トラックの個数
 #define LOOKUP_TABLE_SIZE	  (1024u)		// Lookup Table の要素数
-#define MOD_LOOKUP_TABLE_SIZE (256u)
+#define MOD_LOOKUP_TABLE_SIZE (128u)
 #define SEQUENCE_LEN		  (16u)
 
 #define POW_2_32			  (4294967296.0f) // 2の32乗
