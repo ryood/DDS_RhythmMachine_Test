@@ -28,11 +28,11 @@ uint8_t bpm = 240;			// 1•ª‚ ‚½‚è‚Ìbeat” (beat=note*4)
 
 int32_t ticksPerNote;		// note‚ ‚½‚è‚ÌƒTƒ“ƒvƒŠƒ“ƒO”
 
-int period = 10000;
+int period = 12000;
 
 // Parameter
 const fp32 *decayLookupTable;
-uint8_t decayAmount = 127;
+uint8_t decayAmount = 255;
 
 uint32_t decayPhaseRegister;
 uint32_t decayTuningWord;
@@ -64,12 +64,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	// •‚“®¬”“_‰‰Z
 	//decayTuningWord = (((double)bpm / 60) * 4) * (uint64_t)POW_2_32 / SAMPLE_CLOCK;
 	// ®”‰‰Z(64bit)
-	decayTuningWord = bpm * ((uint64_t)POW_2_32 / 60) * 4 / SAMPLE_CLOCK;
+	//decayTuningWord = bpm * ((uint64_t)POW_2_32 / 60) * 4 / SAMPLE_CLOCK;
 
 	// decay‚Ìü”g”‚ÉdecayAmount‚Åd‚İ•t‚¯
 	// •‚“®¬”“_‰‰Z
 	//decayTuningWord = ((((double)bpm / 60) * 4) / ((double)decayAmount / 256)) * (double)POW_2_32 / SAMPLE_CLOCK;
-	// ®”‰‰Z
+	// ®”‰‰Z(64bit)
+	decayTuningWord = (bpm * ((uint64_t)POW_2_32 / 60) * 4 * 256 / decayAmount) / SAMPLE_CLOCK;
   	
 	decayPhaseRegister = 0;
 
