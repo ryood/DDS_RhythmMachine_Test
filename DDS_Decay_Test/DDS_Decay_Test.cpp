@@ -54,19 +54,27 @@ int _tmain(int argc, _TCHAR* argv[])
 	// ª®”‰‰Z‚Ì‚½‚ßŠÛ‚ß‚Ä‚¢‚é‚Ì‚Å’ˆÓ
 	printf("ticksPerNote:\t%d\n", ticksPerNote);
 
-	// DDS•Ï”‚Ì‰Šú‰»
+	// DDS•Ï”‚Ì‰Šú‰»------------------------------------------------------------------------
+	// •‚“®¬”“_‰‰Z
 	//decayPeriod = (SAMPLE_CLOCK / (((double)bpm / 60) * 4))  * ((double)decayAmount / 256);
+	// ®”‰‰Z
 	decayPeriod = ((uint32_t)SAMPLE_CLOCK * 60 * decayAmount) / ((uint32_t)bpm * 4 * 256);
 	
 	// decay‚Ìü”g”‚Í1note•ª
+	// •‚“®¬”“_‰‰Z
 	//decayTuningWord = (((double)bpm / 60) * 4) * (uint64_t)POW_2_32 / SAMPLE_CLOCK;
-	//decayTuningWord = bpm * ((uint64_t)POW_2_32 / 60) * decayAmount / (SAMPLE_CLOCK * 256);
+	// ®”‰‰Z(64bit)
+	decayTuningWord = bpm * ((uint64_t)POW_2_32 / 60) * 4 / SAMPLE_CLOCK;
 
 	// decay‚Ìü”g”‚ÉdecayAmount‚Åd‚İ•t‚¯
-	decayTuningWord = ((((double)bpm / 60) * 4) / ((double)decayAmount / 256)) * (double)POW_2_32 / SAMPLE_CLOCK;
+	// •‚“®¬”“_‰‰Z
+	//decayTuningWord = ((((double)bpm / 60) * 4) / ((double)decayAmount / 256)) * (double)POW_2_32 / SAMPLE_CLOCK;
+	// ®”‰‰Z
   	
 	decayPhaseRegister = 0;
+
 	printf("tunigWord:%u\tphaseRegister:%u\tperiod:%u\n", decayTuningWord, decayPhaseRegister, decayPeriod);
+	
 	decayStop = 0;
 
 	for (int i = 0; i < period; i++) {
