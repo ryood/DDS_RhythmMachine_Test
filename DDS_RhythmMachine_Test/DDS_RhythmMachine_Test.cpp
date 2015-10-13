@@ -53,7 +53,7 @@ bpmAmount         : 8bit
 #define POW_2_32				(4294967296ull) // 2の32乗
 
 // 変数の初期値
-#define INITIAL_BPM				(120u)
+#define INITIAL_BPM				(200u)
 
 // カウンター
 int tick = -1;				// 初回に0にインクリメント
@@ -92,7 +92,7 @@ struct track {
 //
 void initTracks()
 {
-	const uint8_t kickSequence[]  = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 };
+	const uint8_t kickSequence[]  = { 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 };
 
 #if 0
 	const uint8_t snareSequence[] = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 };
@@ -101,9 +101,9 @@ void initTracks()
 	// Kick
 	tracks[0].waveLookupTable = waveTableSine;
 	tracks[0].decayLookupTable = modTableDown;
-	tracks[0].waveFrequency = 60.0f;
+	tracks[0].waveFrequency = 200.0f;
 	tracks[0].decayAmount = 127;
-	tracks[0].ampAmount = 200;
+	tracks[0].ampAmount = 255;
 	tracks[0].toneAmount = 127;
 	memcpy(tracks[0].sequence, kickSequence, SEQUENCE_LEN);
 
@@ -167,7 +167,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	for (int i = 0; i < period; i++)
 	{
 		tick++;
-		
+
 		if (tick >= ticksPerNote) {
 			noteCount++;
 			//printf("%d\t%d\n", tick, noteCount);
@@ -175,18 +175,25 @@ int _tmain(int argc, _TCHAR* argv[])
 			// noteの先頭でtickをリセット
 			tick = 0;
 
-			// noteの先頭でdecayPhaserRegisterをリセット
+			// noteの先頭でwavePhaseRegister, decayPhaserRegisterをリセット
 			for (int j = 0; j < TRACK_N; j++) {
+				tracks[j].wavePhaseRegister = 0;
 				tracks[j].decayPhaseRegister = 0;
 				tracks[j].decayStop = 0;
 			}
 		}
-		//printf("%d\t%d\t", noteCount, tick);
-	
+		printf("%d\t%d\t", noteCount, tick);
+
 		// トラックの処理
 		//
-		for (int j = 0; j < TRACK_N; j++) { 
-			
+		for (int j = 0; j < TRACK_N; j++) {
+			/*
+			if (tracks[j].sequence[noteCount % SEQUENCE_LEN] == 0) {
+				tracks[j].waveValue = int_to_fp32(0);
+				//printf("\n");
+				continue;
+			}
+			*/
 			// Decayの処理 ***********************************************************
 			//
 			//***********************************************************************
@@ -196,70 +203,75 @@ int _tmain(int argc, _TCHAR* argv[])
 			if (tick == tracks[j].decayPeriod - 1) {
 				tracks[j].decayStop = 1;
 			}
-			
+
 			// 32bitのphaseRegisterをテーブルの7bit(128個)に丸める
 			int decayIndex = tracks[j].decayPhaseRegister >> 25;
-			printf("%d\t%d\t%d\t", tick, tracks[j].decayPhaseRegister, decayIndex);
-			
+			//printf("%d\t%d\t%d\t", tick, tracks[j].decayPhaseRegister, decayIndex);
+
 			tracks[j].decayValue = *(tracks[j].decayLookupTable + decayIndex);
-			printf("%f\t", fp32_to_double(tracks[j].decayValue));
+			//printf("%f\t", fp32_to_double(tracks[j].decayValue));
 
 			// サンプル毎の振幅変調の合算 **********************************************
 			//
 			//************************************************************************ 
 			fp32 amValue = tracks[j].decayValue;
-			printf("%f\t",fp32_to_double(amValue));
-			
+			//printf("%f\t", fp32_to_double(amValue));
+
 			// Wave系の処理 ***********************************************************
 			//
 			//************************************************************************
 			tracks[j].wavePhaseRegister += tracks[j].waveTuningWord;
-			printf("%d\t", tracks[j].wavePhaseRegister);
-	
+			//printf("%d\t", tracks[j].wavePhaseRegister);
+
 			// lookupTableの要素数に丸める
 			// 32bit -> 10bit
 			uint16_t index = tracks[j].wavePhaseRegister >> 22;
-			printf("%d\t", index);
+			//printf("%d\t", index);
 
 			tracks[j].waveValue = *(tracks[j].waveLookupTable + index);
-			printf("%f\t", fp32_to_double(tracks[j].waveValue));
+			//printf("%f\t", fp32_to_double(tracks[j].waveValue));
 
 			// 振幅変調 ***************************************************************
 			// waveValue: -1.0 .. 1.0
 			// amValue:    0.0 .. 1.0
 			//************************************************************************
 			tracks[j].waveValue = fp32_mul(tracks[j].waveValue, amValue);
-			printf("%f\n", fp32_to_double(tracks[j].waveValue));
+			//printf("%f\t", fp32_to_double(tracks[j].waveValue));
+
+			//printf("\n");
 		}
-#if 0		
-		// トラックの合成
-		//
-		//printf("%d", noteCount % SEQUENCE_LEN);
 		
+		// トラックの合成 ***********************************************************
+		//
+		// ************************************************************************
 		fp32 synthWaveValue = int_to_fp32(0);
 		for (int i = 0; i < TRACK_N; i++) {
+			fp32 fv;
 			// 各トラックの出力値： waveValue * sequence[note](Velocity) * ampAmount
-			fp32 v = fp32_mul(tracks[i].waveValue, ((fp32)tracks[i].sequence[noteCount % SEQUENCE_LEN]));
-			v = fp32_mul(v, ((fp32)tracks[i].ampAmount / UINT8_MAX));
-			//printf("%f\t", v);
-			synthWaveValue = fp32_add(synthWaveValue, v); 
-#endif
+			fv = fp32_mul(tracks[i].waveValue, int_to_fp32(tracks[i].sequence[noteCount % SEQUENCE_LEN]));
+			fv = fp32_mul(fv, int_to_fp32(tracks[i].ampAmount));
+			fv = fp32_div(fv, int_to_fp32(UINT8_MAX));
+			//printf("%f\t", fp32_to_double(fv));
+			synthWaveValue = fp32_add(synthWaveValue, fv); 
+		}
+		printf("%f\t", fp32_to_double(synthWaveValue));
 
-		//　for precise float output 
-		//printf("%f", synthWaveValue);
-		//printf("\n");
-		
 		// 出力値の補正 ***********************************************************
 		//
 		// ************************************************************************
 		// for 12bit output (0..4096)
-//		int16_t output_12bit = (fp32_to_double(synthWaveValue) + 1.0f) * 2048;
-		//printf("%d\n", output_12bit);
+		//
+		fp32 fp32_12bit = fp32_mul(synthWaveValue + int_to_fp32(1), int_to_fp32(2048));
+		printf("%d\t", fp32_to_int(fp32_12bit));
 
 		// for 16bit output (-32768 .. 32767)
-//		int16_t output_16bit = fp32_to_double(synthWaveValue) * 32768;
-		//printf("%d\n", output_16bit); 
-		//fwrite(&output_16bit_raw, sizeof(output_16bit), 1, stdout);
+		//
+		fp32 fp32_16bit = fp32_mul(synthWaveValue, int_to_fp32(32768));
+		int16_t out_16bit = fp32_to_int(fp32_16bit);
+		printf("%d\t", out_16bit);
+		//fwrite(&out_16bit, sizeof(out_16bit), 1, stdout);
+
+		printf("\n");
 	}	
 	return 0;
 }
