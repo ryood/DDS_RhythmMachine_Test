@@ -45,7 +45,7 @@ bpmAmount         : 8bit
 #define SAMPLE_CLOCK			(48000u)	// 48kHz
 
 //#define TRACK_N				(3u)		// トラックの個数
-#define TRACK_N					(1u)		// トラックの個数
+#define TRACK_N					(2u)		// トラックの個数
 #define WAVE_LOOKUP_TABLE_SIZE	(1024u)		// Lookup Table の要素数
 #define MOD_LOOKUP_TABLE_SIZE	(128u)
 #define SEQUENCE_LEN		 	(16u)
@@ -53,7 +53,7 @@ bpmAmount         : 8bit
 #define POW_2_32				(4294967296ull) // 2の32乗
 
 // 変数の初期値
-#define INITIAL_BPM				(200u)
+#define INITIAL_BPM				(120u)
 
 // カウンター
 int tick = -1;				// 初回に0にインクリメント
@@ -64,7 +64,7 @@ uint8_t bpm;				// 1分あたりのbeat数 (beat=note*4)
 uint32_t ticksPerNote;			// noteあたりのサンプリング数
 
 // 再生時間
-int period = 24000;
+int period = 96000;
 
 struct track {
 	const fp32 *waveLookupTable;
@@ -92,32 +92,30 @@ struct track {
 //
 void initTracks()
 {
-	const uint8_t kickSequence[]  = { 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 };
-
-#if 0
+	const uint8_t kickSequence[]  = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 };
 	const uint8_t snareSequence[] = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 };
+#if 0
 	const uint8_t hihatSequnce[]  = { 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1 };
 #endif
 	// Kick
 	tracks[0].waveLookupTable = waveTableSine;
 	tracks[0].decayLookupTable = modTableDown;
-	tracks[0].waveFrequency = 200.0f;
-	tracks[0].decayAmount = 127;
+	tracks[0].waveFrequency = 60.0f;
+	tracks[0].decayAmount = 255;
 	tracks[0].ampAmount = 255;
 	tracks[0].toneAmount = 127;
 	memcpy(tracks[0].sequence, kickSequence, SEQUENCE_LEN);
 
-#if 0
 	// Snare
-	tracks[1].lookupTable = waveTableSine;
-	tracks[1].waveFrequency = int_to_fp32(200);
-	tracks[1].decayAmount = 32;
-	tracks[1].ampAmount = 127;
+	tracks[1].waveLookupTable = waveTableSine;
+	tracks[1].decayLookupTable = modTableDown;
+	tracks[1].waveFrequency = 125.0f;
+	tracks[1].decayAmount = 128;
+	tracks[1].ampAmount = 255;
 	tracks[1].toneAmount = 127;
-	tracks[1].decayCount = 0;
-	tracks[1].decayStop = 0;
 	memcpy(tracks[1].sequence, snareSequence, SEQUENCE_LEN);
 
+#if 0
 	// HiHat
 	tracks[2].lookupTable = waveTableWhiteNoise;
 	tracks[2].waveFrequency = int_to_fp32(10);
@@ -130,6 +128,28 @@ void initTracks()
 #endif
 }
 
+//*******************************************************************
+// 波形の生成
+//
+fp32 generateDDSWave(uint32_t *phaseRegister, uint32_t tuningWord, const fp32 *lookupTable)
+{
+	*phaseRegister += tuningWord;
+
+	// lookupTableの要素数に丸める
+	// 32bit -> 10bit
+	uint16_t index = (*phaseRegister) >> 22;
+	fp32 waveValue = *(lookupTable + index);
+
+	printf("%d\t", *phaseRegister);
+	printf("%d\t", index);
+	printf("%f\t", fp32_to_double(waveValue));
+
+	return waveValue;
+}
+
+//*******************************************************************
+// メインルーチン
+//
 int _tmain(int argc, _TCHAR* argv[])
 {
 	_setmode(_fileno(stdout), _O_BINARY);
@@ -151,7 +171,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		tracks[i].waveTuningWord = tracks[i].waveFrequency * POW_2_32 / SAMPLE_CLOCK;
 		tracks[i].wavePhaseRegister = 0;
 		printf("track:\t%d\n", i);
-		printf("waveFrequency:\t%l\n", tracks[i].waveFrequency);
+		printf("waveFrequency:\t%f\n", tracks[i].waveFrequency);
 		printf("waveTunigWord:\t%u\n", tracks[i].waveTuningWord);
 
 		// Decay
@@ -220,16 +240,36 @@ int _tmain(int argc, _TCHAR* argv[])
 			// Wave系の処理 ***********************************************************
 			//
 			//************************************************************************
+			/*
 			tracks[j].wavePhaseRegister += tracks[j].waveTuningWord;
-			//printf("%d\t", tracks[j].wavePhaseRegister);
+			printf("%d\t", tracks[j].wavePhaseRegister);
 
 			// lookupTableの要素数に丸める
 			// 32bit -> 10bit
 			uint16_t index = tracks[j].wavePhaseRegister >> 22;
-			//printf("%d\t", index);
+			printf("%d\t", index);
 
 			tracks[j].waveValue = *(tracks[j].waveLookupTable + index);
-			//printf("%f\t", fp32_to_double(tracks[j].waveValue));
+			printf("%f\t", fp32_to_double(tracks[j].waveValue));
+			*/
+			switch (j) {
+			case 0:	// kick
+				tracks[j].waveValue = generateDDSWave(
+					&(tracks[j].wavePhaseRegister),
+					tracks[j].waveTuningWord,
+					tracks[j].waveLookupTable);
+				break;
+			case 1:	// snare
+				tracks[j].waveValue = generateDDSWave(
+					&(tracks[j].wavePhaseRegister),
+					tracks[j].waveTuningWord,
+					tracks[j].waveLookupTable);
+				break;
+			case 2:	// hihat
+				break;
+			default:
+				fprintf(stderr, "Track no. out of range: %d\n", j);
+			}			
 
 			// 振幅変調 ***************************************************************
 			// waveValue: -1.0 .. 1.0
@@ -262,13 +302,13 @@ int _tmain(int argc, _TCHAR* argv[])
 		// for 12bit output (0..4096)
 		//
 		fp32 fp32_12bit = fp32_mul(synthWaveValue + int_to_fp32(1), int_to_fp32(2048));
-		printf("%d\t", fp32_to_int(fp32_12bit));
+		//printf("%d\t", fp32_to_int(fp32_12bit));
 
 		// for 16bit output (-32768 .. 32767)
 		//
 		fp32 fp32_16bit = fp32_mul(synthWaveValue, int_to_fp32(32768));
 		int16_t out_16bit = fp32_to_int(fp32_16bit);
-		printf("%d\t", out_16bit);
+		//printf("%d\t", out_16bit);
 		//fwrite(&out_16bit, sizeof(out_16bit), 1, stdout);
 
 		printf("\n");
