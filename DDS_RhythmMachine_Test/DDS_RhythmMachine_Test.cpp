@@ -44,8 +44,7 @@ bpmAmount         : 8bit
 **********************************************************/
 #define SAMPLE_CLOCK			(48000u)	// 48kHz
 
-//#define TRACK_N				(3u)		// トラックの個数
-#define TRACK_N					(2u)		// トラックの個数
+#define TRACK_N					(3u)		// トラックの個数
 #define WAVE_LOOKUP_TABLE_SIZE	(1024u)		// Lookup Table の要素数
 #define MOD_LOOKUP_TABLE_SIZE	(128u)
 #define SEQUENCE_LEN		 	(16u)
@@ -94,9 +93,8 @@ void initTracks()
 {
 	const uint8_t kickSequence[]  = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 };
 	const uint8_t snareSequence[] = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 };
-#if 0
 	const uint8_t hihatSequnce[]  = { 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1 };
-#endif
+
 	// Kick
 	tracks[0].waveLookupTable = waveTableSine;
 	tracks[0].decayLookupTable = modTableDown;
@@ -115,17 +113,14 @@ void initTracks()
 	tracks[1].toneAmount = 127;
 	memcpy(tracks[1].sequence, snareSequence, SEQUENCE_LEN);
 
-#if 0
 	// HiHat
-	tracks[2].lookupTable = waveTableWhiteNoise;
-	tracks[2].waveFrequency = int_to_fp32(10);
-	tracks[2].decayAmount = 8;
-	tracks[2].ampAmount = 64;
+	tracks[2].waveLookupTable = waveTableSine;
+	tracks[2].decayLookupTable = modTableDown;
+	tracks[2].waveFrequency = 2000.0f;
+	tracks[2].decayAmount = 32;
+	tracks[2].ampAmount = 32;
 	tracks[2].toneAmount = 127;
-	tracks[2].decayCount = 0;
-	tracks[2].decayStop = 0;
 	memcpy(tracks[2].sequence, hihatSequnce, SEQUENCE_LEN);
-#endif
 }
 
 //*******************************************************************
@@ -139,12 +134,25 @@ fp32 generateDDSWave(uint32_t *phaseRegister, uint32_t tuningWord, const fp32 *l
 	// 32bit -> 10bit
 	uint16_t index = (*phaseRegister) >> 22;
 	fp32 waveValue = *(lookupTable + index);
-
+	/*
 	printf("%d\t", *phaseRegister);
 	printf("%d\t", index);
 	printf("%f\t", fp32_to_double(waveValue));
-
+	*/
 	return waveValue;
+}
+
+fp32 generateNoise()
+{
+	uint32_t r, v;
+	fp32 fv;
+	
+	r = (uint32_t)rand() << 1;
+	v = (r & 0x8000) ? (0xffff0000 | (r << 1)) : (r << 1);
+	fv = (fp32)v;
+	//printf("%u\t%d\t%f\t", r, v, fp32_to_double(fv));
+
+	return fv;
 }
 
 //*******************************************************************
@@ -159,29 +167,36 @@ int _tmain(int argc, _TCHAR* argv[])
 	// BPMの計算
 	//
 	bpm = INITIAL_BPM;
-	printf("bpm:\t%d\n", bpm);
+	//printf("bpm:\t%d\n", bpm);
 
 	ticksPerNote = SAMPLE_CLOCK * 60 / (bpm * 4);
 	// ↑整数演算のため丸めているので注意
-	printf("ticksPerNote:\t%d\n", ticksPerNote);
+	//printf("ticksPerNote:\t%d\n", ticksPerNote);
 
 	// DDS用の変数の初期化
 	for (int i = 0; i < TRACK_N; i++) {
 		// 波形
 		tracks[i].waveTuningWord = tracks[i].waveFrequency * POW_2_32 / SAMPLE_CLOCK;
 		tracks[i].wavePhaseRegister = 0;
+		/*
 		printf("track:\t%d\n", i);
 		printf("waveFrequency:\t%f\n", tracks[i].waveFrequency);
 		printf("waveTunigWord:\t%u\n", tracks[i].waveTuningWord);
-
+		*/
 		// Decay
+		//decayPeriod = (SAMPLE_CLOCK / (((double)bpm / 60) * 4)) * ((double)decayAmount / 256);
 		tracks[i].decayPeriod = ((uint64_t)SAMPLE_CLOCK * 60 * tracks[i].decayAmount) / ((uint64_t)bpm * 4 * 256);
+
+		//decayTuningWord = ((((double)bpm / 60) * 4) / ((double)decayAmount / 256)) * (double)POW_2_32 / SAMPLE_CLOCK;
 		tracks[i].decayTuningWord = (bpm * ((uint64_t)POW_2_32 / 60) * 4 * 256 / tracks[i].decayAmount) / SAMPLE_CLOCK;
+		
 		tracks[i].decayPhaseRegister = 0;
 		tracks[i].decayStop = 0;
+		/*
 		printf("decayAmount:\t%u\n", tracks[i].decayAmount);
 		printf("decayPeriod:\t%u\n", tracks[i].decayPeriod);
 		printf("decayTunigWord:\t%u\n", tracks[i].decayTuningWord);
+		*/
 	}
 
 	for (int i = 0; i < period; i++)
@@ -202,7 +217,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				tracks[j].decayStop = 0;
 			}
 		}
-		printf("%d\t%d\t", noteCount, tick);
+		//printf("%d\t%d\t", noteCount, tick);
 
 		// トラックの処理
 		//
@@ -240,18 +255,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			// Wave系の処理 ***********************************************************
 			//
 			//************************************************************************
-			/*
-			tracks[j].wavePhaseRegister += tracks[j].waveTuningWord;
-			printf("%d\t", tracks[j].wavePhaseRegister);
-
-			// lookupTableの要素数に丸める
-			// 32bit -> 10bit
-			uint16_t index = tracks[j].wavePhaseRegister >> 22;
-			printf("%d\t", index);
-
-			tracks[j].waveValue = *(tracks[j].waveLookupTable + index);
-			printf("%f\t", fp32_to_double(tracks[j].waveValue));
-			*/
 			switch (j) {
 			case 0:	// kick
 				tracks[j].waveValue = generateDDSWave(
@@ -266,6 +269,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					tracks[j].waveLookupTable);
 				break;
 			case 2:	// hihat
+				tracks[j].waveValue = generateNoise();
 				break;
 			default:
 				fprintf(stderr, "Track no. out of range: %d\n", j);
@@ -294,19 +298,33 @@ int _tmain(int argc, _TCHAR* argv[])
 			//printf("%f\t", fp32_to_double(fv));
 			synthWaveValue = fp32_add(synthWaveValue, fv); 
 		}
-		printf("%f\t", fp32_to_double(synthWaveValue));
+		//printf("%f\t", fp32_to_double(synthWaveValue));
 
 		// 出力値の補正 ***********************************************************
 		//
 		// ************************************************************************
-		// for 12bit output (0..4096)
+		
+		// リミッター
 		//
-		fp32 fp32_12bit = fp32_mul(synthWaveValue + int_to_fp32(1), int_to_fp32(2048));
-		//printf("%d\t", fp32_to_int(fp32_12bit));
+		if (synthWaveValue >= int_to_fp32(1))
+			synthWaveValue = int_to_fp32(1);
+		else if (synthWaveValue < int_to_fp32(-1))
+			synthWaveValue = int_to_fp32(-1);
+
+		// for 12bit output (0..4095)
+		// 2048で乗算すると12bit幅を超えるため2047で乗算
+		//
+		fp32 fp32_12bit = fp32_mul(synthWaveValue + int_to_fp32(1), int_to_fp32(2047));
+		int16_t i12v = fp32_to_int(fp32_12bit);
+		//printf("%d\t", i12v);
+
+		// for 12bit output (0..4096) as 16bit RAW format
+		//
+		printf("%d\t", (int)(i12v - 2048) << 4);
 
 		// for 16bit output (-32768 .. 32767)
 		//
-		fp32 fp32_16bit = fp32_mul(synthWaveValue, int_to_fp32(32768));
+		fp32 fp32_16bit = fp32_mul(synthWaveValue, int_to_fp32(32767));
 		int16_t out_16bit = fp32_to_int(fp32_16bit);
 		//printf("%d\t", out_16bit);
 		//fwrite(&out_16bit, sizeof(out_16bit), 1, stdout);
