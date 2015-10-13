@@ -5,6 +5,7 @@
 // Wave:  DDSÇ≈ê∂ê¨
 // Decay: DDSÇ≈ê∂ê¨
 //
+// 2015.10.13 TrackÇÃçáê¨
 // 2015.10.13 DDS_Decay_TestÇÃåãâ ÇîΩâf
 // 2015.10.11 DecayÇDDSèàóùÇ…ïœçX
 // 2015.10.11 Q16Ç…ïœçX
@@ -13,6 +14,7 @@
 
 #include "stdafx.h"
 
+#include <stdio.h>
 #include <stdint.h>
 
 #include <stdio.h>
@@ -93,13 +95,13 @@ void initTracks()
 {
 	const uint8_t kickSequence[]  = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0 };
 	const uint8_t snareSequence[] = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 };
-	const uint8_t hihatSequnce[]  = { 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1 };
+	const uint8_t hihatSequnce[]  = { 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1 };
 
 	// Kick
 	tracks[0].waveLookupTable = waveTableSine;
 	tracks[0].decayLookupTable = modTableDown;
 	tracks[0].waveFrequency = 60.0f;
-	tracks[0].decayAmount = 255;
+	tracks[0].decayAmount = 200;
 	tracks[0].ampAmount = 255;
 	tracks[0].toneAmount = 127;
 	memcpy(tracks[0].sequence, kickSequence, SEQUENCE_LEN);
@@ -107,18 +109,18 @@ void initTracks()
 	// Snare
 	tracks[1].waveLookupTable = waveTableSine;
 	tracks[1].decayLookupTable = modTableDown;
-	tracks[1].waveFrequency = 125.0f;
+	tracks[1].waveFrequency = 120.0f;
 	tracks[1].decayAmount = 128;
 	tracks[1].ampAmount = 255;
 	tracks[1].toneAmount = 127;
 	memcpy(tracks[1].sequence, snareSequence, SEQUENCE_LEN);
 
 	// HiHat
-	tracks[2].waveLookupTable = waveTableSine;
+	tracks[2].waveLookupTable = 0;				// unused
 	tracks[2].decayLookupTable = modTableDown;
-	tracks[2].waveFrequency = 2000.0f;
-	tracks[2].decayAmount = 32;
-	tracks[2].ampAmount = 32;
+	tracks[2].waveFrequency = 0.0f;				// unused
+	tracks[2].decayAmount = 24;
+	tracks[2].ampAmount = 24;
 	tracks[2].toneAmount = 127;
 	memcpy(tracks[2].sequence, hihatSequnce, SEQUENCE_LEN);
 }
@@ -318,7 +320,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		int16_t i12v = fp32_to_int(fp32_12bit);
 		//printf("%d\t", i12v);
 
-		// for 12bit output (0..4096) as 16bit RAW format
+		// for 12bit output (0..4095) as 16bit RAW format
 		//
 		printf("%d\t", (int)(i12v - 2048) << 4);
 
